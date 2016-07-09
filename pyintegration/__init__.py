@@ -4,6 +4,7 @@ import sys
 
 from pyintegration.channel import ErrorChannel, PointToPointChannel
 from pyintegration.filter import Filter, FilterEndpoint
+from pyintegration.transformer import TransformerEndpoint
 
 
 class PyIntegration(object):
@@ -36,6 +37,14 @@ class PyIntegration(object):
         filter_endpoint = FilterEndpoint(selector)
         self.components.append(filter_endpoint)
         return filter_endpoint
+
+    def create_transformer_endpoint(self, transformer):
+        '''
+        Creates a Transformer Endpoint
+        '''
+        transformer = TransformerEndpoint(transformer)
+        self.components.append(transformer)
+        return transformer
 
     def start(self):
         '''
