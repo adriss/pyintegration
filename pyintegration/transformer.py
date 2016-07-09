@@ -4,7 +4,8 @@
 from pyintegration.component import Component
 from pyintegration.message import Message
 
-class TransformerEndpoint(Component):
+
+class Transformer(Component):
     '''
     Message Transformers play a very important role in enabling the loose-coupling 
     of Message Producers and Message Consumers. Rather than requiring every 
@@ -12,9 +13,12 @@ class TransformerEndpoint(Component):
     Transformers can be added between those components. Generic transformers, 
     such as one that converts a String to an XML Document, are also highly reusable.
     '''
-    def __init__(self, transformer):
+    def __init__(self, transform):
+        '''
+        transform must return a 'Message'
+        '''
         Component.__init__(self)
-        self.transformer = transformer
+        self.transform = transform
         self.point_to_component = []
 
     def point_to(self, component):
@@ -27,7 +31,7 @@ class TransformerEndpoint(Component):
         '''
         Receives a message and sends it to its criteria.
         '''
-        transformed_message = self.transformer.transform(message)
+        transformed_message = self.transform(message)
         self.message(transformed_message)
             
     def message(self, message):
@@ -35,10 +39,3 @@ class TransformerEndpoint(Component):
         Sends the message to a single consumer.
         '''
         self.send_to_ref(self.point_to_component[0].ref(), Message.to_message(message))   
-
-class Transformer(object):
-    '''
-    Returns true if the message should be accepted.
-    '''
-    def transform(self, message):
-        raise Exception('Not Implemented')

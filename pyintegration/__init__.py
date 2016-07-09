@@ -3,8 +3,8 @@
 import sys
 
 from pyintegration.channel import ErrorChannel, PointToPointChannel
-from pyintegration.filter import Filter, FilterEndpoint
-from pyintegration.transformer import TransformerEndpoint
+from pyintegration.filter import Filter
+from pyintegration.transformer import Transformer
 
 
 class PyIntegration(object):
@@ -30,19 +30,19 @@ class PyIntegration(object):
         '''
         return self.the_error_channel
 
-    def create_filter_endpoint(self, selector):
+    def create_filter(self, accept):
         '''
-        Creates a Filter Endpoint
+        Creates a Filter
         '''
-        filter_endpoint = FilterEndpoint(selector)
-        self.components.append(filter_endpoint)
-        return filter_endpoint
+        the_filter = Filter(accept)
+        self.components.append(the_filter)
+        return the_filter
 
-    def create_transformer_endpoint(self, transformer):
+    def create_transformer(self, transform):
         '''
-        Creates a Transformer Endpoint
+        Creates a Transformer
         '''
-        transformer = TransformerEndpoint(transformer)
+        transformer = Transformer(transform)
         self.components.append(transformer)
         return transformer
 
