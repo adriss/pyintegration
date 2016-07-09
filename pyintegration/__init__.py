@@ -3,6 +3,7 @@
 import sys
 
 from pyintegration.channel import ErrorChannel, PointToPointChannel
+from pyintegration.filter import Filter, FilterEndpoint
 
 
 class PyIntegration(object):
@@ -10,29 +11,37 @@ class PyIntegration(object):
     Python Enterprise Integration Framework.
     '''
     def __init__(self):
-        self.channels = list()  
-
+        self.components = list()
+        self.the_error_channel = ErrorChannel()
+        self.components.append(self.the_error_channel)
+        
     def create_point_to_point_channel(self):
         '''
         Creates a Point-to-Point Channel.
         '''
         channel = PointToPointChannel()
-        self.channels.append(channel)
+        self.components.append(channel)
         return channel
 
-    def create_error_channel(self):
+    def error_channel(self):
         '''
-        Creates an Error Channel
+        Returns the Error Channel
         '''
-        channel = ErrorChannel()
-        self.channels.append(channel)
-        return channel
+        return self.the_error_channel
+
+    def create_filter_endpoint(self, selector):
+        '''
+        Creates a Filter Endpoint
+        '''
+        filter_endpoint = FilterEndpoint(selector)
+        self.components.append(filter_endpoint)
+        return filter_endpoint
 
     def start(self):
         '''
         Starts this PyIntegration.
         '''
-        for component in self.channels:
+        for component in self.components:
             try:
                 component.start()
             except Exception as e:
@@ -42,7 +51,7 @@ class PyIntegration(object):
         '''
         Stops this PyIntegration.
         '''
-        for component in self.channels:
+        for component in self.components:
             try:
                 component.stop()
             except Exception as e:
