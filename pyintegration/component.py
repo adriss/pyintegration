@@ -60,15 +60,16 @@ class ThreadingComponent(_MessageComponent):
         self.consumer_thread = None
         self.producer_thread = None
 
+    def start_actor(self, actor, actor_ref):
+        return actor.start_acting(actor_ref)
+
     def consume(self, producer):
         '''
         Consumes from producer in a non-blocking fashion.
         '''
         if not isinstance(producer, ThreadingComponent):
             raise Exception('Invalid Producer')
-        consumer_actor = ConsumerActor(self._queue())
-        producer_actor_ref = ProducerActor.start(producer._queue())
-        consumer_actor.start_acting(producer_actor_ref)
+        self.start_actor(ConsumerActor(self._queue()), ProducerActor.start(producer._queue()))
 
     def produce(self, consumer):
         '''
@@ -76,9 +77,7 @@ class ThreadingComponent(_MessageComponent):
         '''
         if not isinstance(consumer, ThreadingComponent):
             raise Exception('Invalid Consumer')
-        producer_actor = ProducerActor(self._queue())
-        consumer_actor_ref = ConsumerActor.start(consumer._queue())
-        producer_actor.start_acting(consumer_actor_ref)
+        self.start_actor(ProducerActor(self._queue()), ConsumerActor.start(consumer._queue()))
 
 class BaseActor(ThreadingActor, Thread):
     '''
