@@ -142,26 +142,28 @@ class ProducerActor(BaseActor):
         Sends messages to consumer
         '''
         try:
-            the_message = self.queue.get(False)
+            the_message = self.queue.get(True, .0005)
             message = _MessageComponent._to_message(the_message)
             logger.info('%s sending message:%s', self, message)
             self.actor_ref.tell(message)
         except (ActorDeadError, Timeout):
             self.running = False
         except Empty:
-            time.sleep(2)
+            time.sleep(.001)
 
     def on_receive(self, message):
         '''
         Sends messages as a response
         '''
         try:
-            the_message = self.queue.get(True, .05)
+            the_message = self.queue.get(True, .0005)
             self.queue.task_done()
             logger.info('%s sending message:%s', self, the_message)
             return the_message
-        except (ActorDeadError, Timeout, Empty):
+        except (ActorDeadError, Timeout):
             return None
+        except Empty:
+            time.sleep(.001)
 
 class ConsumerActor(BaseActor):
     def while_alive(self):
@@ -169,7 +171,7 @@ class ConsumerActor(BaseActor):
         Receives messages from producer
         '''
         try:
-            actor_message = self.actor_ref.ask({'message':'_m_'}, timeout=.05)
+            actor_message = self.actor_ref.ask({'message':'_m_'}, timeout=.0005)
             if actor_message is not None:
                 logger.info('%s received message:%s', self, actor_message)
                 self.queue.put(actor_message)
@@ -177,9 +179,9 @@ class ConsumerActor(BaseActor):
             self.running = False
         except Timeout:
             self.running = False
+            time.sleep(.001)
 
     def on_receive(self, message):
-        logger.info('%s on_receive', self)
         '''
         Receives messages
         '''
