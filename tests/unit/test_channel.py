@@ -23,6 +23,7 @@ def test_pipe_2_channels_no_message():
     channel2 = PointToPointThreadingChannel()
     try:
         channel2.consume(channel1)
+        time.sleep(.005)
     finally:
         PyIntegration.stop_all()
 
@@ -31,7 +32,7 @@ def test_2_channels_message_no_pipe():
     channel2 = PointToPointThreadingChannel()
     assert 0 == channel1.size()
     assert 0 == channel2.size()
-    channel1.put(Message('hello'))
+    channel1.put(Message('test_2_channels_message_no_pipe'))
     assert 1 == channel1.size()
     assert 0 == channel2.size()
 
@@ -39,11 +40,11 @@ def test_1_channel_consumes_from_other():
     channel1 = PointToPointThreadingChannel()
     channel2 = PointToPointThreadingChannel()
     try:
-        channel1.put(Message('hello'))
+        channel1.put(Message('test_1_channel_consumes_from_other'))
         assert 1 == channel1.size()
         assert 0 == channel2.size()
         channel2.consume(channel1)
-        time.sleep(1)
+        time.sleep(.005)
         assert 0 == channel1.size()
         assert 1 == channel2.size()
     finally:
@@ -53,11 +54,11 @@ def test_1_channel_produces_to_other():
     channel1 = PointToPointThreadingChannel()
     channel2 = PointToPointThreadingChannel()
     try:
-        channel1.put(Message('hello'))
+        channel1.put(Message('test_1_channel_produces_to_other'))
         assert 1 == channel1.size()
         assert 0 == channel2.size()
         channel1.produce(channel2)
-        time.sleep(1)
+        time.sleep(.005)
         assert 0 == channel1.size()
         assert 1 == channel2.size()
     finally:
@@ -68,11 +69,11 @@ def test_3_channels_message():
     channel2 = PointToPointThreadingChannel()
     channel3 = PointToPointThreadingChannel()
     try:
-        channel1.put(Message('hello'))
-        channel2.put(Message('bye'))
+        channel1.put(Message('test_3_channels_message-1'))
+        channel2.put(Message('test_3_channels_message-2'))
         channel2.consume(channel1)
         channel3.consume(channel2)
-        time.sleep(1)
+        time.sleep(.005)
         assert 0 == channel1.size()
         assert 0 == channel2.size()
         assert 2 == channel3.size()

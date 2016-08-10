@@ -1,43 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from pykka.threading import ThreadingActor
-from pyintegration.message import Message
 from Queue import Queue, Empty
+import logging
+from threading import Thread
 import threading
 import time
-from pykka.exceptions import Timeout, ActorDeadError
+
 from pykka.actor import ActorRef
-import logging
+from pykka.exceptions import Timeout, ActorDeadError
+from pykka.threading import ThreadingActor
+
+from pyintegration.message import Message
+
 
 logger = logging.getLogger('pyintegration')
-
-class Component(object):
-    '''
-    Base class for all components of PyIntegration. This class implements
-    PyKka's Actor model to provide a message-driven solution.
-    '''
-    def ref(self):
-        return self.actor_ref
-    
-    def receive(self, message):
-        raise Exception('Not Implemented')
-    
-    def start(self):
-        self.actor_ref = _ComponentActor.start(self)
-
-    def stop(self):
-        '''
-        Stops this component
-        '''
-        self.actor_ref.stop()
-
-    def send_to_ref(self, actor_ref, message):
-        if not isinstance(message, Message):
-            raise Exception("Invalid Message")
-        '''
-        Sends a message to an actor reference.
-        '''
-        actor_ref.tell(_ComponentActor.to_message(message))
 
 class _MessageComponent(object):
     def __init__(self, queue=None):
@@ -90,8 +66,9 @@ class ThreadingComponent(_MessageComponent):
         '''
         if not isinstance(producer, ThreadingComponent):
             raise Exception('Invalid Producer')
-        self.consumer_thread = ConsumerThread(self._queue(), producer)
-        self.consumer_thread.start()
+        consumer_actor = ConsumerActor(self._queue())
+        producer_actor_ref = ProducerActor.start(producer._queue())
+        consumer_actor.start_acting(producer_actor_ref)
 
     def produce(self, consumer):
         '''
@@ -99,146 +76,114 @@ class ThreadingComponent(_MessageComponent):
         '''
         if not isinstance(consumer, ThreadingComponent):
             raise Exception('Invalid Consumer')
-        #self.consumer_thread = ConsumerThread(self._queue(), self)
-        #self.consumer_thread.start()
+        producer_actor = ProducerActor(self._queue())
+        consumer_actor_ref = ConsumerActor.start(consumer._queue())
+        producer_actor.start_acting(consumer_actor_ref)
 
-        self.producer_thread = ProducerThread(self._queue(), consumer)
-        self.producer_thread.start()
-
-    def _produce(self, message):
-        self.producer.tell(ThreadingComponent._to_message(message))
-
-    def _producer(self, thread):
-        '''
-        Creates a Producer to allow this component distribute messages.
-        '''
-        return ProducerActor.start(self._queue(), thread)
-
-    def _consumer(self, thread):
-        '''
-        Creates a Consumer to allow this component receive messages.
-        '''
-        return ConsumerActor.start(self._queue(), thread)
-
-class BaseActor(ThreadingActor):
+class BaseActor(ThreadingActor, Thread):
     '''
     This actor, upon getting an 'ask' message, returns a messages from its queue.
     It will wait until a message is found in the queue.
     '''
-    def __init__(self, queue, thread):
-        super(BaseActor, self).__init__()
+    def __init__(self, queue):
+        ThreadingActor.__init__(self)
+        Thread.__init__(self)
         self.queue = queue
-        self.thread = thread
+        self.running = False
+        self._thread_event = None
+
+    def start_acting(self, actor_ref):
+        if not isinstance(actor_ref, ActorRef):
+            raise Exception("Invalid ActorRef")
+        self.actor_ref = actor_ref
+        self.running = True
+        self._thread_event = threading.Event()
+        threading.Thread.start(self)
+
+    def stopped(self):
+        return self._thread_event.isSet()
 
     def on_start(self):
+        '''
+        ThreadingActor override
+        '''
         pass
-
+    
     def on_stop(self):
-        self.thread.stop()
+        '''
+        ThreadingActor override
+        '''
+        self.stop_acting()
+
+    def stop_acting(self):
+        if self.running:
+            self.running = False
+            self._thread_event.set()
 
     def on_failure(self, exception_type, exception_value, traceback):
+        '''
+        ThreadingActor override
+        '''
         logger.error('%s, %s, %s', exception_type, exception_value, traceback)
-        self.thread.stop()
+        self.stop_acting()
+
+    def run(self):
+        '''
+        Runs while alive
+        '''
+        while self.running and self.actor_ref.is_alive():
+            self.while_alive()
+
+    def while_alive(self):
+        pass
 
 class ProducerActor(BaseActor):
+    def while_alive(self):
+        '''
+        Sends messages to consumer
+        '''
+        try:
+            the_message = self.queue.get(False)
+            message = _MessageComponent._to_message(the_message)
+            logger.info('%s sending message:%s', self, message)
+            self.actor_ref.tell(message)
+        except (ActorDeadError, Timeout):
+            self.running = False
+        except Empty:
+            time.sleep(2)
+
     def on_receive(self, message):
         '''
-        Produces a message, if any available.
+        Sends messages as a response
         '''
-        if self.queue.empty():
+        try:
+            the_message = self.queue.get(True, .05)
+            self.queue.task_done()
+            logger.info('%s sending message:%s', self, the_message)
+            return the_message
+        except (ActorDeadError, Timeout, Empty):
             return None
-        the_message = self.queue.get()
-        self.queue.task_done()
-        logger.info('%s sending message:%s', self, the_message)
-        return the_message
 
 class ConsumerActor(BaseActor):
-    def on_receive(self, message):
+    def while_alive(self):
         '''
-        All messages received are placed in the queue.
+        Receives messages from producer
+        '''
+        try:
+            actor_message = self.actor_ref.ask({'message':'_m_'}, timeout=.05)
+            if actor_message is not None:
+                logger.info('%s received message:%s', self, actor_message)
+                self.queue.put(actor_message)
+        except ActorDeadError:
+            self.running = False
+        except Timeout:
+            self.running = False
+
+    def on_receive(self, message):
+        logger.info('%s on_receive', self)
+        '''
+        Receives messages
         '''
         the_message = _MessageComponent._from_message(message)
         logger.info('%s received message:%s', self, the_message)
         self.queue.put(the_message)
-
-class BaseThread(threading.Thread):
-    def __init__(self):
-        self.running = True
-        self._stop = threading.Event()
-        threading.Thread.__init__(self)
-
-    def stop(self):
-        self.running = False
-        self._stop.set()
-        
-    def stopped(self):
-        return self._stop.isSet()
-
-    def start(self):
-        threading.Thread.start(self)
-
-class ProducerThread(BaseThread):
-    def __init__(self, queue, consumer):
-        self.queue = queue
-        self.consumer = consumer
-        BaseThread.__init__(self)
-
-    def run(self):
-        consumer_actor = self.consumer._consumer(self)
-        if not isinstance(consumer_actor, ActorRef):
-            raise Exception("Can't produce to consumer")
-        while self.running and consumer_actor.is_alive():
-            try:
-                the_message = self.queue.get(False)
-                message = _MessageComponent._to_message(the_message)
-                consumer_actor.tell(message)
-            except (ActorDeadError, Timeout):
-                self.running = False
-            except Empty:
-                time.sleep(2)
-
-class ConsumerThread(BaseThread):
-    def __init__(self, queue, producer):
-        self.queue = queue
-        self.producer = producer
-        BaseThread.__init__(self)
-
-    def run(self):
-        producer = self.producer._producer(self)
-        while self.running and producer.is_alive():
-            try:
-                actor_message = producer.ask({'message':'_m_'})
-                if actor_message is not None:
-                    logger.info('%s received message:%s', self, actor_message)
-                    self.queue.put(actor_message)
-            except ActorDeadError:
-                self.running = False
-            except Timeout:
-                self.running = False
-
-class _ComponentActor(ThreadingActor):
-    def __init__(self, receiver):
-        super(_ComponentActor, self).__init__()
-        self.receiver = receiver
-
-    @staticmethod
-    def MESSAGE_KEY():
-        return 'message'
-
-    @staticmethod
-    def to_message(message):
-        if isinstance(message, dict) and _ComponentActor.MESSAGE_KEY() in message:
-            return message
-        else:
-            return {_ComponentActor.MESSAGE_KEY() : message}
-            
-    @staticmethod
-    def from_message(message):
-        return message[_ComponentActor.MESSAGE_KEY()]
-
-
-    def on_failure(self, exception_type, exception_value, traceback):
-        logger.error('Failure %s', traceback)
-
-    def on_receive(self, message):
-        self.receiver.receive(self.from_message(message))

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from pyintegration.component import Component
+from pyintegration.component import ThreadingComponent
 
 
-class Transformer(Component):
+class Transformer(ThreadingComponent):
     '''
     Message Transformers play a very important role in enabling the loose-coupling 
     of Message Producers and Message Consumers. Rather than requiring every 
@@ -16,7 +16,7 @@ class Transformer(Component):
         '''
         transform must return a 'Message'
         '''
-        Component.__init__(self)
+        super(Transformer, self).__init__()
         self.transform = transform
         self.point_to_component = []
 

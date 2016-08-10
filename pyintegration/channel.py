@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from pyintegration.component import Component, ThreadingComponent
+from pyintegration.component import ThreadingComponent
 
 
-class Channel(Component):
+class Channel(ThreadingComponent):
     '''
     A Message Channel represents the "pipe" of a pipes-and-filters architecture. 
     Producers send Messages to a channel, and consumers receive Messages from a channel. 
@@ -13,7 +13,7 @@ class Channel(Component):
     point for interception and monitoring of Messages.
     '''
     def __init__(self):
-        Component.__init__(self)
+        super(ThreadingComponent, self).__init__()
         
     def point_to(self, component):
         raise Exception('Not Implemented')
@@ -29,7 +29,7 @@ class PointToPointChannel(Channel):
     With a Point-to-Point channel, at most one consumer can receive each Message sent to the channel.
     '''
     def __init__(self):
-        Component.__init__(self)
+        ThreadingComponent.__init__(self)
         self.point_to_component = []
 
     def point_to(self, consumer):
