@@ -15,14 +15,18 @@ from pyintegration.message import Message
 
 logger = logging.getLogger('pyintegration')
 
-class _MessageComponent(object):
+class ThreadingComponent(object):
+    '''
+    Base class for all components of PyIntegration. This class implements
+    PyKka's Actor model to provide a message-driven solution.
+    '''
     def __init__(self, queue=None):
-        super(_MessageComponent, self).__init__()
+        super(ThreadingComponent, self).__init__()
         if queue is None:
             self.q = Queue()
         else:
             self.q = queue
-
+    
     def size(self):
         return self.q.qsize()
 
@@ -41,24 +45,14 @@ class _MessageComponent(object):
 
     @staticmethod
     def _to_message(message):
-        if isinstance(message, dict) and _MessageComponent._MESSAGE_KEY() in message:
+        if isinstance(message, dict) and ThreadingComponent._MESSAGE_KEY() in message:
             return message
         else:
-            return {_MessageComponent._MESSAGE_KEY() : str(message)}
+            return {ThreadingComponent._MESSAGE_KEY() : str(message)}
            
     @staticmethod
     def _from_message(message):
         return message[ThreadingComponent._MESSAGE_KEY()]
-
-class ThreadingComponent(_MessageComponent):
-    '''
-    Base class for all components of PyIntegration. This class implements
-    PyKka's Actor model to provide a message-driven solution.
-    '''
-    def __init__(self, queue=None):
-        super(ThreadingComponent, self).__init__(queue)
-        self.consumer_thread = None
-        self.producer_thread = None
 
     def start_actor(self, actor, actor_ref):
         return actor.start_acting(actor_ref)
@@ -143,7 +137,7 @@ class ProducerActor(BaseActor):
         '''
         try:
             the_message = self.queue.get(True, .0005)
-            message = _MessageComponent._to_message(the_message)
+            message = ThreadingComponent._to_message(the_message)
             logger.info('%s sending message:%s', self, message)
             self.actor_ref.tell(message)
         except (ActorDeadError, Timeout):
@@ -185,6 +179,6 @@ class ConsumerActor(BaseActor):
         '''
         Receives messages
         '''
-        the_message = _MessageComponent._from_message(message)
+        the_message = ThreadingComponent._from_message(message)
         logger.info('%s received message:%s', self, the_message)
         self.queue.put(the_message)
