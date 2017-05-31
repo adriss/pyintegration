@@ -60,8 +60,8 @@ class PointToPointThreadingChannel(ThreadingComponent):
     '''
     With a Point-to-Point channel, at most one consumer can receive each Message sent to the channel.
     '''
-    def __init__(self):
-        super(PointToPointThreadingChannel, self).__init__()
+    def __init__(self, name = None):
+        super(PointToPointThreadingChannel, self).__init__(name)
 
 class ErrorChannel(Channel):
     def __init__(self):

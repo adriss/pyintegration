@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 from pyintegration.component import ThreadingComponent
+import logging
 
+logger = logging.getLogger('pyintegration')
 
 class Transformer(ThreadingComponent):
+
     '''
     Message Transformers play a very important role in enabling the loose-coupling 
     of Message Producers and Message Consumers. Rather than requiring every 
@@ -18,23 +20,19 @@ class Transformer(ThreadingComponent):
         '''
         super(Transformer, self).__init__()
         self.transform = transform
-        self.point_to_component = []
+        self.the_input_channel = None
+        self.the_output_channel = None
 
-    def point_to(self, component):
-        self.point_to_component.insert(0, component)
+    def input_channel(self, the_input_channel):
+        self.the_input_channel = the_input_channel
 
-    '''
-    Transform a message.
-    '''
-    def receive(self, message):
-        '''
-        Receives a message and sends it to its criteria.
-        '''
-        transformed_message = self.transform(message)
-        self.message(transformed_message)
-            
-    def message(self, message):
-        '''
-        Sends the message to a single consumer.
-        '''
-        self.send_to_ref(self.point_to_component[0].ref(), message)   
+    def output_channel(self, the_output_channel):
+        self.the_output_channel = the_output_channel
+        self.consume(self.the_input_channel)
+        self.the_output_channel.consume(self)
+
+    def produce_on_receive(self, message, queue):
+        the_message = super(Transformer, self).produce_on_receive(message, queue)
+        if the_message is not None:
+            the_message = self.transform(the_message)
+        return the_message
